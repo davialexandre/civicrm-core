@@ -27,6 +27,7 @@
 
 namespace Civi\API\Subscriber;
 
+use Civi\API\DynamicFK\Authorizer;
 use Civi\API\Events;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -365,6 +366,10 @@ class DynamicFKAuthorization implements EventSubscriberInterface {
     );
 
     return $this->kernel->runAuthorize($entity, $this->getDelegatedAction($action), $params);
+  }
+
+  public function addAuthorizer(Authorizer $authorizer) {
+      $this->authorizers[] = $authorizer;
   }
 
 }

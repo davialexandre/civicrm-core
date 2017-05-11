@@ -1,6 +1,7 @@
 <?php
 namespace Civi\Core;
 
+use Civi\API\DependencyInjection\Compiler\DynamicFKAuthorizationPass;
 use Civi\API\Provider\ActionObjectProvider;
 use Civi\Core\Event\SystemInstallEvent;
 use Civi\Core\Lock\LockManager;
@@ -103,6 +104,7 @@ class Container {
     $civicrm_base_path = dirname(dirname(__DIR__));
     $container = new ContainerBuilder();
     $container->addCompilerPass(new RegisterListenersPass('dispatcher'));
+    $container->addCompilerPass(new DynamicFKAuthorizationPass());
     $container->addObjectResource($this);
     $container->setParameter('civicrm_base_path', $civicrm_base_path);
     //$container->set(self::SELF, $this);
@@ -220,6 +222,34 @@ class Container {
       ))->addTag('kernel.event_subscriber');
     }
 
+      $container->setDefinition("civi_dynamic_fk_authorization", new Definition(
+          "Civi\API\Subscriber\DynamicFKAuthorization",
+          array(
+              new Reference('civi_api_kernel'),
+              'Attachment',
+              array('create', 'get', 'delete'),
+              // Given a file ID, determine the entity+table it's attached to.
+              'SELECT if(cf.id,1,0) as is_valid, cef.entity_table, cef.entity_id
+         FROM civicrm_file cf
+         LEFT JOIN civicrm_entity_file cef ON cf.id = cef.file_id
+         WHERE cf.id = %1',
+              // Get a list of custom fields (field_name,table_name,extends)
+              'SELECT concat("custom_",fld.id) as field_name,
+        grp.table_name as table_name,
+        grp.extends as extends
+       FROM civicrm_custom_field fld
+       INNER JOIN civicrm_custom_group grp ON fld.custom_group_id = grp.id
+       WHERE fld.data_type = "File"
+      ',
+              array('civicrm_activity', 'civicrm_mailing', 'civicrm_contact', 'civicrm_grant')
+          )
+      ))->addTag('kernel.event_subscriber');
+
+    $container->setDefinition("civi_api_dynamicfk_default_authorizer", new Definition(
+      "Civi\API\DynamicFK\DefaultAuthorizer",
+      array(new Reference('civi_api_kernel'))
+    ))->addTag('civi.dynamic_fk_authorizer');
+
     if (\CRM_Utils_Constant::value('CIVICRM_FLEXMAILER_HACK_SERVICES')) {
       \Civi\Core\Resolver::singleton()->call(CIVICRM_FLEXMAILER_HACK_SERVICES, array($container));
     }
@@ -319,25 +349,25 @@ class Container {
     $reflectionProvider = new \Civi\API\Provider\ReflectionProvider($kernel);
     $dispatcher->addSubscriber($reflectionProvider);
 
-    $dispatcher->addSubscriber(new \Civi\API\Subscriber\DynamicFKAuthorization(
-      $kernel,
-      'Attachment',
-      array('create', 'get', 'delete'),
-      // Given a file ID, determine the entity+table it's attached to.
-      'SELECT if(cf.id,1,0) as is_valid, cef.entity_table, cef.entity_id
-         FROM civicrm_file cf
-         LEFT JOIN civicrm_entity_file cef ON cf.id = cef.file_id
-         WHERE cf.id = %1',
-      // Get a list of custom fields (field_name,table_name,extends)
-      'SELECT concat("custom_",fld.id) as field_name,
-        grp.table_name as table_name,
-        grp.extends as extends
-       FROM civicrm_custom_field fld
-       INNER JOIN civicrm_custom_group grp ON fld.custom_group_id = grp.id
-       WHERE fld.data_type = "File"
-      ',
-      array('civicrm_activity', 'civicrm_mailing', 'civicrm_contact', 'civicrm_grant')
-    ));
+//    $dispatcher->addSubscriber(new \Civi\API\Subscriber\DynamicFKAuthorization(
+//      $kernel,
+//      'Attachment',
+//      array('create', 'get', 'delete'),
+//      // Given a file ID, determine the entity+table it's attached to.
+//      'SELECT if(cf.id,1,0) as is_valid, cef.entity_table, cef.entity_id
+//         FROM civicrm_file cf
+//         LEFT JOIN civicrm_entity_file cef ON cf.id = cef.file_id
+//         WHERE cf.id = %1',
+//      // Get a list of custom fields (field_name,table_name,extends)
+//      'SELECT concat("custom_",fld.id) as field_name,
+//        grp.table_name as table_name,
+//        grp.extends as extends
+//       FROM civicrm_custom_field fld
+//       INNER JOIN civicrm_custom_group grp ON fld.custom_group_id = grp.id
+//       WHERE fld.data_type = "File"
+//      ',
+//      array('civicrm_activity', 'civicrm_mailing', 'civicrm_contact', 'civicrm_grant')
+//    ));
 
     $kernel->setApiProviders(array(
       $reflectionProvider,
