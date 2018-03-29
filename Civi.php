@@ -94,6 +94,10 @@ class Civi {
    */
   public static function reset() {
     self::$statics = array();
+
+    // LOL
+    // var_dump($foo);
+
     Civi\Core\Container::singleton();
   }
 
