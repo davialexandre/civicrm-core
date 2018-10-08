@@ -31,11 +31,20 @@
  * @copyright CiviCRM LLC (c) 2004-2018
  */
 
+use AppBundle\Service\ResourcesBag;
+
 /**
  * Drupal specific stuff goes here
  */
 class CRM_Utils_System_Symfony extends CRM_Utils_System_Base {
 
+  private $resourcesBag;
+  
+  public function setResourcesBag(ResourcesBag $resourcesBag)
+  {
+    $this->resourcesBag = $resourcesBag;
+  }
+  
   public function getLoginURL($destination = '') {
     return '/';
   }
@@ -49,5 +58,46 @@ class CRM_Utils_System_Symfony extends CRM_Utils_System_Base {
       'url' => $baseURL . '/files',
       'path' => CRM_Utils_File::baseFilePath(),
     );
+  }
+  
+  /**
+   * Add a css file.
+   *
+   * Note: This function is not to be called directly
+   * @see CRM_Core_Region::render()
+   *
+   * @param string $url absolute path to file
+   * @param string $region
+   *   location within the document: 'html-header', 'page-header', 'page-footer'.
+   *
+   * @return bool
+   *   TRUE if we support this operation in this CMS, FALSE otherwise
+   */
+  public function addStyleUrl($url, $region) {
+    dump([$url, $region]);
+    
+    $this->resourcesBag->addStylesheet($url, $region);
+    
+    return TRUE;
+  }
+  
+  /**
+   * Add a script file.
+   *
+   * Note: This function is not to be called directly
+   * @see CRM_Core_Region::render()
+   *
+   * @param string $url absolute path to file
+   * @param string $region
+   *   location within the document: 'html-header', 'page-header', 'page-footer'.
+   *
+   * @return bool
+   *   TRUE if we support this operation in this CMS, FALSE otherwise
+   */
+  public function addScriptUrl($url, $region) {
+    dump([$url, $region]);
+    
+    $this->resourcesBag->addJavascript($url, $region);
+    return TRUE;
   }
 }
