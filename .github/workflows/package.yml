@@ -1,0 +1,58 @@
+name: Packaging
+on:
+  push:
+    tags:
+      - 5.19.4+patch.*
+
+env:
+  civi_ver: 5.19.4
+
+jobs:
+  build:
+    name: Packaging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Civi
+        env:
+          civi_package: civicrm-${{ env.civi_ver }}-drupal.tar.gz
+        run: |
+          wget https://storage.googleapis.com/civicrm/civicrm-stable/${civi_ver}/${civi_package}
+          tar xzf ./${civi_package}
+
+      - name: Checking out patches branch
+        uses: actions/checkout@v2-beta
+        with:
+          ref: ${{ env.civi_ver }}
+          path: fork
+
+      - name: Patching && Package
+        id: package
+        run: |
+          pwd
+          ls -la
+          cd fork
+          git --no-pager diff -p ..origin/${civi_ver}-patches ':!.github' > ../civicrm/patch.diff
+          cd ../civicrm/
+          patch -p1 patch.diff
+          rm -f patch.diff
+          sed 's@</version_no@+patch.'${GITHUB_SHA}'</version_no@g' xml/version.xml
+          cd ..
+          tar czf civicrm-${civi_ver}-patch-${GITHUB_SHA}-drupal.tar.gz civicrm
+          echo $GITHUB_REF
+
+      - name: Debug
+        env:
+          JOB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$JOB_CONTEXT"
+
+#      - name: Create a new release
+#        uses: actions/create-release@v1
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          tag_name: "${{ env.civi_ver }}+patch.${{ github.sha }}"
+#          release_name: "${{ env.civi_ver }}+patch.${{ github.sha }}"
+#          body: "${{ env.civi_ver }}+patch.${{ github.sha }}"
+
+      - run: ls -la
